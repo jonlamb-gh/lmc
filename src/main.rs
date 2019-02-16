@@ -10,18 +10,22 @@ extern crate oxcc_nucleo_f767zi as bsp;
 // extern crate panic_semihosting;
 
 mod board;
+mod dac_mcp4922;
 
-use crate::bsp::debug_console::DebugConsole;
-use crate::bsp::led::{Color, Leds};
+// use crate::bsp::debug_console::DebugConsole;
+// use crate::bsp::led::{Color, Leds};
 use crate::rt::{entry, exception, ExceptionFrame};
+use board::Board;
 use core::fmt::Write;
-use panic_semihosting::*;
-
-const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
+use panic_semihosting;
 
 #[entry]
 fn main() -> ! {
-    panic!("HERE");
+    let mut board = Board::new();
+    // TODO - split board components
+
+    writeln!(board.debug_console, "Here").ok();
+
     // TODO
     loop {}
 }
