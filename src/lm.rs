@@ -1,4 +1,4 @@
-use crate::board::{LMDac, LMDacEnablePin};
+use crate::board::{LMDac, LMDacEnablePin, DAC_CHANNEL};
 use crate::bsp::hal::prelude::*;
 
 pub struct Lm {
@@ -28,5 +28,11 @@ impl Lm {
             self.dac_enable_pin.set_high();
         }
         self.enabled = enable;
+    }
+
+    pub fn set_dac(&mut self, value: u16) {
+        if self.enabled {
+            self.dac.output(value, DAC_CHANNEL).expect("TODO")
+        }
     }
 }

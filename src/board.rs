@@ -11,7 +11,7 @@ use crate::bsp::hal::gpio::gpiod::PD12;
 use crate::bsp::hal::gpio::{Output, PushPull, AF5};
 use crate::bsp::hal::spi::Spi;
 use crate::bsp::hal::stm32f7x7::SPI1;
-use crate::dac_mcp4922::Mcp4922;
+use crate::dac_mcp4922::{Mcp4922, Channel as DACChannel};
 use crate::dac_mcp4922::MODE as DAC_MODE;
 
 pub type LMDacEnablePin = PD12<Output<PushPull>>;
@@ -24,6 +24,8 @@ pub type LMSpiNssPin = PA4<Output<PushPull>>;
 pub type LMSpi = Spi<SPI1, (PA5<AF5>, PA6<AF5>, PA7<AF5>)>;
 
 pub type LMDac = Mcp4922<LMSpi, LMSpiNssPin>;
+
+pub const DAC_CHANNEL: DACChannel = DACChannel::ChannelA;
 
 pub struct Board {
     pub debug_console: DebugConsole,

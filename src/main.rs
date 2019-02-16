@@ -18,6 +18,7 @@ mod lm;
 use crate::rt::{entry, exception, ExceptionFrame};
 use board::Board;
 use core::fmt::Write;
+use lm::Lm;
 use panic_semihosting;
 
 #[entry]
@@ -25,7 +26,13 @@ fn main() -> ! {
     let mut board = Board::new();
     // TODO - split board components
 
+    let mut lm = Lm::new(board.lm_dac, board.lm_dac_enable);
+
     writeln!(board.debug_console, "Here").ok();
+
+    lm.set_enabled(true);
+
+    lm.set_dac(0x00F);
 
     // TODO
     loop {}
