@@ -14,7 +14,8 @@ mod dac_mcp4922;
 mod lm;
 
 // use crate::bsp::debug_console::DebugConsole;
-// use crate::bsp::led::{Color, Leds};
+use crate::bsp::hal::prelude::*;
+use crate::bsp::led::Color;
 use crate::rt::{entry, exception, ExceptionFrame};
 use board::Board;
 use core::fmt::Write;
@@ -28,14 +29,23 @@ fn main() -> ! {
 
     let mut lm = Lm::new(board.lm_dac, board.lm_dac_enable);
 
-    writeln!(board.debug_console, "Here").ok();
+    board.leds[Color::Blue].on();
 
-    lm.set_enabled(true);
+    writeln!(board.debug_console, "Starting").ok();
 
-    lm.set_dac(0x00F);
+    loop {
+        while board.user_button.is_high() {
+            board.leds[Color::Red].on();
+            if lm.enabled() == false {
+                lm.set_enabled(true);
+            }
+            lm.set_dac(0x0FF);
+        }
 
-    // TODO
-    loop {}
+        lm.set_dac(0);
+        lm.set_enabled(false);
+        board.leds[Color::Red].on();
+    }
 }
 
 #[exception]

@@ -30,6 +30,10 @@ impl Lm {
         self.enabled = enable;
     }
 
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
     pub fn set_dac(&mut self, value: u16) {
         if self.enabled {
             self.dac.output(value, DAC_CHANNEL).expect("TODO")

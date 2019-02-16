@@ -11,8 +11,8 @@ use crate::bsp::hal::gpio::gpiod::PD12;
 use crate::bsp::hal::gpio::{Output, PushPull, AF5};
 use crate::bsp::hal::spi::Spi;
 use crate::bsp::hal::stm32f7x7::SPI1;
-use crate::dac_mcp4922::{Mcp4922, Channel as DACChannel};
 use crate::dac_mcp4922::MODE as DAC_MODE;
+use crate::dac_mcp4922::{Channel as DACChannel, Mcp4922};
 
 pub type LMDacEnablePin = PD12<Output<PushPull>>;
 
