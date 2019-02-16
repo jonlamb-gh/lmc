@@ -11,6 +11,7 @@ extern crate oxcc_nucleo_f767zi as bsp;
 
 mod board;
 mod dac_mcp4922;
+mod lm;
 
 // use crate::bsp::debug_console::DebugConsole;
 // use crate::bsp::led::{Color, Leds};
