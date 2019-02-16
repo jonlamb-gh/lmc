@@ -1,0 +1,33 @@
+[package]
+name = "laser-module-controller"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+edition = "2018"
+
+[dependencies.panic-semihosting]
+version = "0.5.1"
+#optional = true
+
+[dependencies.cortex-m-semihosting]
+version = "0.3.2"
+#optional = true
+
+[dependencies.cortex-m]
+version = "0.5.8"
+features = ["const-fn"]
+
+[dependencies.cortex-m-rt]
+version = "0.6.7"
+features = ["device"]
+
+[dependencies.oxcc-nucleo-f767zi]
+version = "0.1.1"
+features = ["rt"]
+
+[dependencies.embedded-hal]
+features = ["unproven"]
+version = "0.2.2"
+
+[profile.release]
+codegen-units = 1 # better optimizations
+lto = true # better optimizations
