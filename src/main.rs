@@ -29,6 +29,9 @@ fn main() -> ! {
     let mut board = Board::new();
     // TODO - split board components
 
+    let mut pot_reader = board.pot_reader;
+    // let mut delay = board.delay;
+
     // Put into low-power mode by default, must enable first
     let mut lm = Lm::new(
         board.lm_dac,
@@ -40,17 +43,23 @@ fn main() -> ! {
 
     writeln!(board.debug_console, "Starting").ok();
 
-    lm.set_enabled(true);
+    lm.enable();
 
     loop {
-        while board.user_button.is_high() {
+        let power = pot_reader.read_pot0();
+        let pulse = pot_reader.read_pot1();
+
+        // TODO - board.debounce(...)
+
+        if board.user_button.is_high() {
             board.leds[Color::Red].on();
             assert_eq!(lm.enabled(), true);
-            lm.set_dac(0xFFF);
+            lm.set_dac(power);
+            writeln!(board.debug_console, "power {} - pulse {}", power, pulse).ok();
+        } else {
+            lm.set_dac(0);
+            board.leds[Color::Red].off();
         }
-
-        lm.set_dac(0);
-        board.leds[Color::Red].off();
     }
 }
 

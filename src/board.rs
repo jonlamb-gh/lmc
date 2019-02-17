@@ -1,16 +1,23 @@
 use crate::bsp::debug_console::DebugConsole;
-use crate::bsp::hal::prelude::*;
-use crate::bsp::hal::rcc::ResetConditions;
-use crate::bsp::hal::serial::Serial;
-use crate::bsp::hal::stm32f7x7;
-use crate::bsp::led::Leds;
-use crate::bsp::UserButtonPin;
-
+use crate::bsp::hal::adc::Adc;
+use crate::bsp::hal::adc::Channel as AdcChannel;
+use crate::bsp::hal::adc::Prescaler as AdcPrescaler;
+use crate::bsp::hal::adc::Resolution as AdcResolution;
+use crate::bsp::hal::adc::SampleTime as AdcSampleTime;
+use crate::bsp::hal::delay::Delay;
 use crate::bsp::hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
 use crate::bsp::hal::gpio::gpiod::{PD12, PD13};
 use crate::bsp::hal::gpio::{Output, PushPull, AF5};
+use crate::bsp::hal::prelude::*;
+use crate::bsp::hal::rcc::ResetConditions;
+use crate::bsp::hal::serial::Serial;
 use crate::bsp::hal::spi::Spi;
+use crate::bsp::hal::stm32f7x7;
+use crate::bsp::hal::stm32f7x7::ADC1;
 use crate::bsp::hal::stm32f7x7::SPI1;
+use crate::bsp::led::Leds;
+use crate::bsp::UserButtonPin;
+use crate::bsp::{AnalogInput0Pin, AnalogInput1Pin};
 use crate::dac_mcp4922::MODE as DAC_MODE;
 use crate::dac_mcp4922::{Channel as DACChannel, Mcp4922};
 
@@ -26,18 +33,36 @@ pub type LMSpi = Spi<SPI1, (PA5<AF5>, PA6<AF5>, PA7<AF5>)>;
 
 pub type LMDac = Mcp4922<LMSpi, LMSpiNssPin>;
 
+// ADC1 pins, potentiometer 0/1
+pub type PotSensor0Pin = AnalogInput0Pin;
+pub type PotSensor1Pin = AnalogInput1Pin;
+
 pub const DAC_CHANNEL: DACChannel = DACChannel::ChannelA;
+
+pub const ADC_PRESCALER: AdcPrescaler = AdcPrescaler::Prescaler4;
+pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
+pub const ADC_RESOLUTION: AdcResolution = AdcResolution::Bits12;
 
 pub struct Board {
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
+    pub delay: Delay,
     // pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
     // TODO - sub structs for pins/etc
     pub lm_dac: LMDac,
     pub lm_dac_shutdown_pin: LMDacShutdownPin,
     pub lm_dac_latch_pin: LMDacLatchPin,
+    //
+    pub pot_reader: PotReader,
+}
+
+// Owns ADC1
+pub struct PotReader {
+    pot0_pin: PotSensor0Pin,
+    pot1_pin: PotSensor1Pin,
+    adc1: Adc<ADC1>,
 }
 
 impl Board {
@@ -56,6 +81,7 @@ impl Board {
 
         let mut flash = peripherals.FLASH.constrain();
         let mut rcc = peripherals.RCC.constrain();
+        let mut c_adc = peripherals.C_ADC;
 
         let mut gpioa = peripherals.GPIOA.split(&mut rcc.ahb1);
         let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
@@ -76,6 +102,13 @@ impl Board {
             .pa4
             .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
 
+        let pot0_pin = gpioa
+            .pa3
+            .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr);
+        let pot1_pin = gpioc
+            .pc0
+            .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr);
+
         let led_r = gpiob
             .pb14
             .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
@@ -95,6 +128,15 @@ impl Board {
         // TODO - enable OverDrive to get 216 MHz
         // configure maximum clock frequency at 200 MHz
         let clocks = rcc.cfgr.freeze_max(&mut flash.acr);
+
+        // TODO - this can be moved into the HAL once it's aware of the clocks
+        let adc_clock = match ADC_PRESCALER {
+            AdcPrescaler::Prescaler2 => clocks.pclk2().0 / 2,
+            AdcPrescaler::Prescaler4 => clocks.pclk2().0 / 4,
+            AdcPrescaler::Prescaler6 => clocks.pclk2().0 / 6,
+            AdcPrescaler::Prescaler8 => clocks.pclk2().0 / 8,
+        };
+        assert!(adc_clock <= 30_000_000);
 
         let mut leds = Leds::new(led_r, led_g, led_b);
         for led in leds.iter_mut() {
@@ -127,9 +169,33 @@ impl Board {
                 .pc13
                 .into_pull_down_input(&mut gpioc.moder, &mut gpioc.pupdr),
             reset_conditions,
+            delay: Delay::new(core_peripherals.SYST, clocks),
             lm_dac: Mcp4922::new(lm_spi, lm_nss),
             lm_dac_shutdown_pin,
             lm_dac_latch_pin,
+            pot_reader: PotReader {
+                pot0_pin,
+                pot1_pin,
+                adc1: Adc::adc1(
+                    peripherals.ADC1,
+                    &mut c_adc,
+                    &mut rcc.apb2,
+                    ADC_PRESCALER,
+                    ADC_RESOLUTION,
+                ),
+            },
         }
+    }
+}
+
+impl PotReader {
+    pub fn read_pot0(&mut self) -> u16 {
+        // AnalogInput0Pin, PA3, ADC123_IN3
+        self.adc1.read(AdcChannel::Adc123In3, ADC_SAMPLE_TIME)
+    }
+
+    pub fn read_pot1(&mut self) -> u16 {
+        // AnalogInput1Pin, PC0, ADC123_IN10
+        self.adc1.read(AdcChannel::Adc123In10, ADC_SAMPLE_TIME)
     }
 }

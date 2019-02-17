@@ -25,9 +25,9 @@ impl Lm {
         lm
     }
 
-    // pub fn enable(&mut self) {
-    //    self.set_enabled(true);
-    // }
+    pub fn enable(&mut self) {
+        self.set_enabled(true);
+    }
 
     pub fn set_enabled(&mut self, enable: bool) {
         if enable {
