@@ -1,31 +1,39 @@
-use crate::board::{LMDac, LMDacEnablePin, DAC_CHANNEL};
+use crate::board::{LMDac, LMDacLatchPin, LMDacShutdownPin, DAC_CHANNEL};
 use crate::bsp::hal::prelude::*;
+use crate::dac_mcp4922::Channel;
 
+// TODO - move latching into the DAC module
 pub struct Lm {
     dac: LMDac,
-    dac_enable_pin: LMDacEnablePin,
+    shutdown_pin: LMDacShutdownPin,
+    latch_pin: LMDacLatchPin,
     enabled: bool,
 }
 
 impl Lm {
-    pub fn new(dac: LMDac, dac_enable_pin: LMDacEnablePin) -> Self {
+    pub fn new(dac: LMDac, shutdown_pin: LMDacShutdownPin, latch_pin: LMDacLatchPin) -> Self {
         let mut lm = Lm {
             dac,
-            dac_enable_pin,
+            shutdown_pin,
+            latch_pin,
             enabled: false,
         };
 
         lm.set_enabled(false);
+        lm.latch();
 
         lm
     }
 
-    // TODO - is it active low?
+    // pub fn enable(&mut self) {
+    //    self.set_enabled(true);
+    // }
+
     pub fn set_enabled(&mut self, enable: bool) {
         if enable {
-            self.dac_enable_pin.set_low();
+            self.shutdown_pin.set_high();
         } else {
-            self.dac_enable_pin.set_high();
+            self.shutdown_pin.set_low();
         }
         self.enabled = enable;
     }
@@ -36,7 +44,24 @@ impl Lm {
 
     pub fn set_dac(&mut self, value: u16) {
         if self.enabled {
-            self.dac.output(value, DAC_CHANNEL).expect("TODO")
+            self.unlatch();
+
+            let (ch_a_val, ch_b_val) = if DAC_CHANNEL == Channel::ChannelA {
+                (value, 0)
+            } else {
+                (0, value)
+            };
+
+            self.dac.output_ab(ch_a_val, ch_b_val).expect("TODO");
+            self.latch();
         }
+    }
+
+    fn latch(&mut self) {
+        self.latch_pin.set_low();
+    }
+
+    fn unlatch(&mut self) {
+        self.latch_pin.set_high();
     }
 }

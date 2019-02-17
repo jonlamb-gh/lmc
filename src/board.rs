@@ -7,14 +7,15 @@ use crate::bsp::led::Leds;
 use crate::bsp::UserButtonPin;
 
 use crate::bsp::hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
-use crate::bsp::hal::gpio::gpiod::PD12;
+use crate::bsp::hal::gpio::gpiod::{PD12, PD13};
 use crate::bsp::hal::gpio::{Output, PushPull, AF5};
 use crate::bsp::hal::spi::Spi;
 use crate::bsp::hal::stm32f7x7::SPI1;
 use crate::dac_mcp4922::MODE as DAC_MODE;
 use crate::dac_mcp4922::{Channel as DACChannel, Mcp4922};
 
-pub type LMDacEnablePin = PD12<Output<PushPull>>;
+pub type LMDacShutdownPin = PD12<Output<PushPull>>;
+pub type LMDacLatchPin = PD13<Output<PushPull>>;
 
 pub type LMSpiSckPin = PA5<AF5>;
 pub type LMSpiMisoPin = PA6<AF5>;
@@ -33,8 +34,10 @@ pub struct Board {
     pub user_button: UserButtonPin,
     // pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
+    // TODO - sub structs for pins/etc
     pub lm_dac: LMDac,
-    pub lm_dac_enable: LMDacEnablePin,
+    pub lm_dac_shutdown_pin: LMDacShutdownPin,
+    pub lm_dac_latch_pin: LMDacLatchPin,
 }
 
 impl Board {
@@ -59,8 +62,11 @@ impl Board {
         let mut gpioc = peripherals.GPIOC.split(&mut rcc.ahb1);
         let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
 
-        let lm_dac_enable = gpiod
+        let lm_dac_shutdown_pin = gpiod
             .pd12
+            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
+        let lm_dac_latch_pin = gpiod
+            .pd13
             .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
 
         let lm_sck: LMSpiSckPin = gpioa.pa5.into_af5(&mut gpioa.moder, &mut gpioa.afrl);
@@ -109,7 +115,7 @@ impl Board {
             peripherals.SPI1,
             (lm_sck, lm_miso, lm_mosi),
             DAC_MODE,
-            1.mhz().into(),
+            4.mhz().into(),
             clocks,
             &mut rcc.apb2,
         );
@@ -122,7 +128,8 @@ impl Board {
                 .into_pull_down_input(&mut gpioc.moder, &mut gpioc.pupdr),
             reset_conditions,
             lm_dac: Mcp4922::new(lm_spi, lm_nss),
-            lm_dac_enable,
+            lm_dac_shutdown_pin,
+            lm_dac_latch_pin,
         }
     }
 }

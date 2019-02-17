@@ -14,12 +14,14 @@ mod dac_mcp4922;
 mod lm;
 
 // use crate::bsp::debug_console::DebugConsole;
+use core::fmt::Write;
+use crate::board::Board;
 use crate::bsp::hal::prelude::*;
 use crate::bsp::led::Color;
+use crate::lm::Lm;
 use crate::rt::{entry, exception, ExceptionFrame};
-use board::Board;
-use core::fmt::Write;
-use lm::Lm;
+
+#[allow(unused_imports)]
 use panic_semihosting;
 
 #[entry]
@@ -27,24 +29,28 @@ fn main() -> ! {
     let mut board = Board::new();
     // TODO - split board components
 
-    let mut lm = Lm::new(board.lm_dac, board.lm_dac_enable);
+    // Put into low-power mode by default, must enable first
+    let mut lm = Lm::new(
+        board.lm_dac,
+        board.lm_dac_shutdown_pin,
+        board.lm_dac_latch_pin,
+    );
 
     board.leds[Color::Blue].on();
 
     writeln!(board.debug_console, "Starting").ok();
 
+    lm.set_enabled(true);
+
     loop {
         while board.user_button.is_high() {
             board.leds[Color::Red].on();
-            if lm.enabled() == false {
-                lm.set_enabled(true);
-            }
-            lm.set_dac(0x0FF);
+            assert_eq!(lm.enabled(), true);
+            lm.set_dac(0xFFF);
         }
 
         lm.set_dac(0);
-        lm.set_enabled(false);
-        board.leds[Color::Red].on();
+        board.leds[Color::Red].off();
     }
 }
 
