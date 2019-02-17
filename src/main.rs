@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(const_fn)]
+#![cfg_attr(feature = "panic-abort", feature(core_intrinsics))]
 
 // extern crate cortex_m;
 extern crate cortex_m_rt as rt;
@@ -12,6 +13,8 @@ extern crate oxcc_nucleo_f767zi as bsp;
 mod board;
 mod dac_mcp4922;
 mod lm;
+#[cfg(feature = "panic-abort")]
+mod panic_abort;
 
 // use crate::bsp::debug_console::DebugConsole;
 use core::fmt::Write;
@@ -22,8 +25,8 @@ use crate::bsp::led::Color;
 use crate::lm::Lm;
 use crate::rt::{entry, exception, ExceptionFrame};
 
-#[allow(unused_imports)]
-use panic_semihosting;
+//#[allow(unused_imports)]
+// use panic_semihosting;
 
 // TODO - fix release mode Spi/DAC issues
 // local panic impl over uart
