@@ -24,41 +24,64 @@ use crate::rt::{entry, exception, ExceptionFrame};
 #[allow(unused_imports)]
 use panic_semihosting;
 
+// TODO - fix release mode Spi/DAC issues
+// local panic impl over uart
+
 #[entry]
 fn main() -> ! {
-    let mut board = Board::new();
+    let board = Board::new();
     // TODO - split board components
 
     let mut pot_reader = board.pot_reader;
-    // let mut delay = board.delay;
+
+    let mut delay = board.delay;
+    let mut dbgcon = board.debug_console;
+    let mut leds = board.leds;
 
     // Put into low-power mode by default, must enable first
     let mut lm = Lm::new(
         board.lm_dac,
+        board.lm_pulse_timer,
         board.lm_dac_shutdown_pin,
         board.lm_dac_latch_pin,
     );
 
-    board.leds[Color::Blue].on();
+    leds[Color::Blue].on();
 
-    writeln!(board.debug_console, "Starting").ok();
-
-    lm.enable();
+    writeln!(dbgcon, "--- INIT ---").ok();
 
     loop {
+        if lm.enabled() == false {
+            writeln!(dbgcon, "Enabling lm").ok();
+            lm.enable();
+            delay.delay_ms(5_u32);
+            lm.power_off();
+            delay.delay_ms(50_u32);
+        }
+
+        // TODO - button debounce(...)
         let power = pot_reader.read_pot0();
+        let enable = board.user_button.is_high();
         let pulse = pot_reader.read_pot1();
 
-        // TODO - board.debounce(...)
+        if enable == false {
+            if lm.powered() {
+                writeln!(dbgcon, "power off").ok();
+            }
 
-        if board.user_button.is_high() {
-            board.leds[Color::Red].on();
-            assert_eq!(lm.enabled(), true);
-            lm.set_dac(power);
-            writeln!(board.debug_console, "power {} - pulse {}", power, pulse).ok();
+            lm.power_off();
+            leds[Color::Red].off();
         } else {
-            lm.set_dac(0);
-            board.leds[Color::Red].off();
+            leds[Color::Red].on();
+
+            if lm.powered() == false {
+                writeln!(dbgcon, "power on - power {} - pulse {}", power, pulse).ok();
+                // TODO - pulse update
+                lm.set_power_pulse(power, None);
+            }
+
+            // TODO - cont. adjustment mode
+            // lm.set_power_pulse(power, None);
         }
     }
 }

@@ -13,13 +13,15 @@ use crate::bsp::hal::rcc::ResetConditions;
 use crate::bsp::hal::serial::Serial;
 use crate::bsp::hal::spi::Spi;
 use crate::bsp::hal::stm32f7x7;
-use crate::bsp::hal::stm32f7x7::ADC1;
-use crate::bsp::hal::stm32f7x7::SPI1;
+use crate::bsp::hal::stm32f7x7::{ADC1, SPI1, TIM2};
+use crate::bsp::hal::timer::Timer;
 use crate::bsp::led::Leds;
 use crate::bsp::UserButtonPin;
 use crate::bsp::{AnalogInput0Pin, AnalogInput1Pin};
 use crate::dac_mcp4922::MODE as DAC_MODE;
 use crate::dac_mcp4922::{Channel as DACChannel, Mcp4922};
+
+pub type LMPulseTimer = Timer<TIM2>;
 
 pub type LMDacShutdownPin = PD12<Output<PushPull>>;
 pub type LMDacLatchPin = PD13<Output<PushPull>>;
@@ -37,6 +39,10 @@ pub type LMDac = Mcp4922<LMSpi, LMSpiNssPin>;
 pub type PotSensor0Pin = AnalogInput0Pin;
 pub type PotSensor1Pin = AnalogInput1Pin;
 
+// pub type Button0Pin = PB4<Output<PushPull>>;
+// pub type Button1Pin = PD11<Output<PushPull>>;
+// pub type Button2Pin = PE2<Output<PushPull>>;
+
 pub const DAC_CHANNEL: DACChannel = DACChannel::ChannelA;
 
 pub const ADC_PRESCALER: AdcPrescaler = AdcPrescaler::Prescaler4;
@@ -52,6 +58,7 @@ pub struct Board {
     pub reset_conditions: ResetConditions,
     // TODO - sub structs for pins/etc
     pub lm_dac: LMDac,
+    pub lm_pulse_timer: LMPulseTimer,
     pub lm_dac_shutdown_pin: LMDacShutdownPin,
     pub lm_dac_latch_pin: LMDacLatchPin,
     //
@@ -171,6 +178,7 @@ impl Board {
             reset_conditions,
             delay: Delay::new(core_peripherals.SYST, clocks),
             lm_dac: Mcp4922::new(lm_spi, lm_nss),
+            lm_pulse_timer: LMPulseTimer::tim2(peripherals.TIM2, 1.hz(), clocks, &mut rcc.apb1),
             lm_dac_shutdown_pin,
             lm_dac_latch_pin,
             pot_reader: PotReader {
