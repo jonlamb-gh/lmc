@@ -50,7 +50,7 @@ fn main() -> ! {
         board.lm_dac_latch_pin,
     );
 
-    leds[Color::Blue].on();
+    leds[Color::Green].on();
 
     writeln!(dbgcon, "--- INIT ---").ok();
 
@@ -84,6 +84,7 @@ fn main() -> ! {
 
             lm.power_off();
             leds[Color::Red].off();
+            leds[Color::Blue].off();
         } else {
             leds[Color::Red].on();
 
@@ -100,6 +101,16 @@ fn main() -> ! {
             // lm.set_power_pulse(power, None);
 
             lm.update_pulse();
+
+            if let Some(ps) = lm.pulse_state() {
+                if ps {
+                    leds[Color::Blue].on();
+                } else {
+                    leds[Color::Blue].off();
+                }
+            } else {
+                leds[Color::Blue].off();
+            }
         }
     }
 }
