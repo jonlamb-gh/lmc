@@ -12,6 +12,7 @@ pub struct Lm {
     enabled: bool,
     power: u16,
     pulse: Option<Hertz>,
+    pulse_state: bool,
 }
 
 impl Lm {
@@ -29,6 +30,7 @@ impl Lm {
             enabled: false,
             power: 0,
             pulse: None,
+            pulse_state: false,
         };
 
         lm.latch();
@@ -50,6 +52,7 @@ impl Lm {
             self.shutdown_pin.set_low();
             self.power = 0;
             self.pulse = None;
+            self.pulse_state = false;
         }
         self.enabled = enable;
     }
@@ -66,21 +69,53 @@ impl Lm {
         }
     }
 
-    // TODO - pulse state, Option<bool>?
+    pub fn pulse_state(&mut self) -> Option<bool> {
+        if self.enabled {
+            if self.power != 0 && self.pulse.is_some() {
+                return Some(self.pulse_state);
+            }
+        }
+
+        None
+    }
 
     pub fn power_off(&mut self) {
         self.set_power_pulse(0, None);
     }
 
-    // TODO - set power/pulse
     // off if power == 0
     pub fn set_power_pulse(&mut self, power: u16, pulse: Option<Hertz>) {
         if self.enabled {
             self.set_dac(power);
             self.power = power;
+            self.pulse_state = false;
 
-            // TODO - pulse
-            self.pulse = pulse;
+            if power != 0 {
+                if let Some(p) = pulse {
+                    self.pulse_timer.start(p);
+                    self.pulse_state = true;
+                }
+                self.pulse = pulse;
+            } else {
+                self.pulse = None;
+            }
+        }
+    }
+
+    // Arrange for this to be called frequently
+    pub fn update_pulse(&mut self) {
+        if let Some(prev_state) = self.pulse_state() {
+            if self.pulse_timer.wait().is_ok() {
+                if prev_state {
+                    // on -> off
+                    self.set_dac(0);
+                } else {
+                    // off -> on
+                    self.set_dac(self.power);
+                }
+
+                self.pulse_state = !prev_state;
+            }
         }
     }
 

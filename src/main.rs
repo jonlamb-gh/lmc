@@ -17,6 +17,7 @@ mod lm;
 use core::fmt::Write;
 use crate::board::Board;
 use crate::bsp::hal::prelude::*;
+use crate::bsp::hal::time::Hertz;
 use crate::bsp::led::Color;
 use crate::lm::Lm;
 use crate::rt::{entry, exception, ExceptionFrame};
@@ -62,7 +63,16 @@ fn main() -> ! {
         // TODO - button debounce(...)
         let power = pot_reader.read_pot0();
         let enable = board.user_button.is_high();
-        let pulse = pot_reader.read_pot1();
+        let pulse_raw = pot_reader.read_pot1();
+
+        let pulse_freq = {
+            let div = pulse_raw / 14;
+            if div == 0 {
+                None
+            } else {
+                Some(Hertz(div as u32))
+            }
+        };
 
         if enable == false {
             if lm.powered() {
@@ -75,13 +85,18 @@ fn main() -> ! {
             leds[Color::Red].on();
 
             if lm.powered() == false {
-                writeln!(dbgcon, "power on - power {} - pulse {}", power, pulse).ok();
-                // TODO - pulse update
-                lm.set_power_pulse(power, None);
+                writeln!(
+                    dbgcon,
+                    "power on - power {} - pulse_raw {} - pulse {:?}",
+                    power, pulse_raw, pulse_freq,
+                ).ok();
+                lm.set_power_pulse(power, pulse_freq);
             }
 
             // TODO - cont. adjustment mode
             // lm.set_power_pulse(power, None);
+
+            lm.update_pulse();
         }
     }
 }
