@@ -52,6 +52,13 @@ fn main() -> ! {
 
     leds[Color::Green].on();
 
+    if board.user_button.is_high() {
+        writeln!(dbgcon, "... waiting for button release").ok();
+        while board.user_button.is_high() {
+            delay.delay_ms(1_u32);
+        }
+    }
+
     writeln!(dbgcon, "--- INIT ---").ok();
 
     loop {
