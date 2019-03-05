@@ -2,6 +2,6 @@
 
 set -e
 
-openocd -f board/stm32f7discovery.cfg
+openocd -f board/stm32f4discovery.cfg
 
 exit 0

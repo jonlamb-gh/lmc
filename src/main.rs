@@ -1,125 +1,61 @@
 #![no_std]
 #![no_main]
-#![feature(const_fn)]
-#![cfg_attr(feature = "panic-abort", feature(core_intrinsics))]
 
-// extern crate cortex_m;
 extern crate cortex_m_rt as rt;
-// extern crate cortex_m_semihosting;
-// extern crate embedded_hal;
-extern crate oxcc_nucleo_f767zi as bsp;
-// extern crate panic_semihosting;
+extern crate stm32f407g_disc as bsp;
 
-mod board;
-mod dac_mcp4922;
-mod lm;
-#[cfg(feature = "panic-abort")]
-mod panic_abort;
-
-// use crate::bsp::debug_console::DebugConsole;
 use core::fmt::Write;
-use crate::board::Board;
+use crate::bsp::hal::i2c::I2c;
 use crate::bsp::hal::prelude::*;
-use crate::bsp::hal::time::Hertz;
-use crate::bsp::led::Color;
-use crate::lm::Lm;
+use crate::bsp::hal::stm32;
 use crate::rt::{entry, exception, ExceptionFrame};
-
-//#[allow(unused_imports)]
-// use panic_semihosting;
-
-// TODO - fix release mode Spi/DAC issues
-// local panic impl over uart
+use panic_semihosting;
+use ssd1306::displayrotation::DisplayRotation;
+use ssd1306::mode::TerminalMode;
+use ssd1306::Builder;
 
 #[entry]
 fn main() -> ! {
-    let board = Board::new();
-    // TODO - split board components
+    let peripherals = stm32::Peripherals::take().expect("Failed to take stm32::Peripherals");
 
-    let mut pot_reader = board.pot_reader;
+    let rcc = peripherals.RCC.constrain();
+    let gpiob = peripherals.GPIOB.split();
 
-    let mut delay = board.delay;
-    let mut dbgcon = board.debug_console;
-    let mut leds = board.leds;
+    let clocks = rcc.cfgr.sysclk(40.mhz()).freeze();
 
-    // Put into low-power mode by default, must enable first
-    let mut lm = Lm::new(
-        board.lm_dac,
-        board.lm_pulse_timer,
-        board.lm_dac_shutdown_pin,
-        board.lm_dac_latch_pin,
-    );
+    let scl = gpiob
+        .pb6
+        .into_alternate_af4()
+        .internal_pull_up(true)
+        .set_open_drain();
 
-    leds[Color::Green].on();
+    let sda = gpiob
+        .pb7
+        .into_alternate_af4()
+        .internal_pull_up(true)
+        .set_open_drain();
 
-    if board.user_button.is_high() {
-        writeln!(dbgcon, "... waiting for button release").ok();
-        while board.user_button.is_high() {
-            delay.delay_ms(1_u32);
-        }
-    }
+    let i2c = I2c::i2c1(peripherals.I2C1, (scl, sda), 400.khz(), clocks);
 
-    writeln!(dbgcon, "--- INIT ---").ok();
+    // Set up the SSD1306 display at I2C address 0x3c
+    let mut disp: TerminalMode<_> = Builder::new().with_i2c_addr(0x3c).connect_i2c(i2c).into();
 
+    // Set display rotation to 180 degrees
+    let _ = disp.set_rotation(DisplayRotation::Rotate180);
+
+    // Init and clear the display
+    let _ = disp.init();
+    let _ = disp.clear();
+
+    // Endless loop rendering ASCII characters all over the place
     loop {
-        if lm.enabled() == false {
-            writeln!(dbgcon, "Enabling lm").ok();
-            lm.enable();
-            delay.delay_ms(5_u32);
-            lm.power_off();
-            delay.delay_ms(50_u32);
-        }
-
-        // TODO - button debounce(...)
-        let power = pot_reader.read_pot0();
-        let enable = board.user_button.is_high();
-        let pulse_raw = pot_reader.read_pot1();
-
-        let pulse_freq = {
-            let div = pulse_raw / 14;
-            if div == 0 {
-                None
-            } else {
-                Some(Hertz(div as u32))
-            }
-        };
-
-        if enable == false {
-            if lm.powered() {
-                writeln!(dbgcon, "power off").ok();
-            }
-
-            lm.power_off();
-            leds[Color::Red].off();
-            leds[Color::Blue].off();
-        } else {
-            leds[Color::Red].on();
-
-            if lm.powered() == false {
-                writeln!(
-                    dbgcon,
-                    "power on - power {} - pulse_raw {} - pulse {:?}",
-                    power, pulse_raw, pulse_freq,
-                ).ok();
-                lm.set_power_pulse(power, pulse_freq);
-            }
-
-            // TODO - cont. adjustment mode
-            // lm.set_power_pulse(power, None);
-
-            lm.update_pulse();
-
-            if let Some(ps) = lm.pulse_state() {
-                if ps {
-                    leds[Color::Blue].on();
-                } else {
-                    leds[Color::Blue].off();
-                }
-            } else {
-                leds[Color::Blue].off();
-            }
+        for c in (97..123).chain(64..91) {
+            let _ = disp.write_str(unsafe { core::str::from_utf8_unchecked(&[c]) });
         }
     }
+
+    // TODO
+    loop {}
 }
 
 #[exception]
