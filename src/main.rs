@@ -1,61 +1,67 @@
+// https://crates.io/crates/pwm-pca9685
+// http://wiki.sunfounder.cc/index.php?title=PCA9685_16_Channel_12_Bit_PWM_Servo_Driver
+
+// https://www.st.com/content/ccc/resource/technical/document/user_manual/98/2e/fa/4b/e0/82/43/b7/DM00105823.pdf/files/DM00105823.pdf/jcr:content/translations/en.DM00105823.pdf
+
 #![no_std]
 #![no_main]
 
 extern crate cortex_m_rt as rt;
-extern crate stm32f407g_disc as bsp;
 
-use core::fmt::Write;
-use crate::bsp::hal::i2c::I2c;
-use crate::bsp::hal::prelude::*;
-use crate::bsp::hal::stm32;
+// mod display;
+// mod lcm;
+
+// use core::fmt::Write;
+// use crate::lcm::Lcm;
+// use crate::display::Display;
 use crate::rt::{entry, exception, ExceptionFrame};
 use panic_semihosting;
-use ssd1306::displayrotation::DisplayRotation;
-use ssd1306::mode::TerminalMode;
-use ssd1306::Builder;
+use pwm_pca9685::{Channel, OutputLogicState, Pca9685, SlaveAddr};
+use stm32f1xx_hal::{i2c::BlockingI2c, i2c::Mode, pac, prelude::*};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = stm32::Peripherals::take().expect("Failed to take stm32::Peripherals");
+    let p = pac::Peripherals::take().expect("Failed to take stm32::Peripherals");
 
-    let rcc = peripherals.RCC.constrain();
-    let gpiob = peripherals.GPIOB.split();
+    let mut flash = p.FLASH.constrain();
+    let mut rcc = p.RCC.constrain();
 
-    let clocks = rcc.cfgr.sysclk(40.mhz()).freeze();
+    let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
-    let scl = gpiob
-        .pb6
-        .into_alternate_af4()
-        .internal_pull_up(true)
-        .set_open_drain();
+    let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
-    let sda = gpiob
-        .pb7
-        .into_alternate_af4()
-        .internal_pull_up(true)
-        .set_open_drain();
+    let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
 
-    let i2c = I2c::i2c1(peripherals.I2C1, (scl, sda), 400.khz(), clocks);
+    let scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
+    let sda = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
 
-    // Set up the SSD1306 display at I2C address 0x3c
-    let mut disp: TerminalMode<_> = Builder::new().with_i2c_addr(0x3c).connect_i2c(i2c).into();
+    let i2c = BlockingI2c::i2c1(
+        p.I2C1,
+        (scl, sda),
+        &mut afio.mapr,
+        Mode::Standard { frequency: 100_000 },
+        clocks,
+        &mut rcc.apb1,
+        1000,
+        10,
+        1000,
+        1000,
+    );
 
-    // Set display rotation to 180 degrees
-    let _ = disp.set_rotation(DisplayRotation::Rotate180);
+    let address = SlaveAddr::default();
+    let mut pwm = Pca9685::new(i2c, address);
+    pwm.set_prescale(3).unwrap();
+    pwm.enable().unwrap();
+    pwm.set_channel_on(Channel::C0, 0).unwrap();
 
-    // Init and clear the display
-    let _ = disp.init();
-    let _ = disp.clear();
-
-    // Endless loop rendering ASCII characters all over the place
+    let mut val: u16 = 0;
     loop {
-        for c in (97..123).chain(64..91) {
-            let _ = disp.write_str(unsafe { core::str::from_utf8_unchecked(&[c]) });
-        }
-    }
+        pwm.set_channel_off(Channel::C0, val).unwrap();
 
-    // TODO
-    loop {}
+        val = val.wrapping_add(1);
+
+        cortex_m::asm::delay(1000);
+    }
 }
 
 #[exception]

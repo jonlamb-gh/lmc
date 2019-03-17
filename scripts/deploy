@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+arm-none-eabi-objcopy \
+    -O ihex \
+    target/thumbv7m-none-eabi/debug/lmc \
+    target/thumbv7m-none-eabi/debug/lmc.hex
+
+st-flash --format ihex write target/thumbv7m-none-eabi/debug/lmc.hex
+
+exit 0
