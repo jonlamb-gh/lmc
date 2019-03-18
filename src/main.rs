@@ -47,7 +47,11 @@ fn main() -> ! {
     let mut flash = p.FLASH.constrain();
     let mut rcc = p.RCC.constrain();
 
-    let clocks = rcc.cfgr.sysclk(32.mhz()).freeze(&mut flash.acr);
+    let clocks = rcc
+        .cfgr
+        .sysclk(64.mhz())
+        .pclk1(32.mhz())
+        .freeze(&mut flash.acr);
 
     let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
@@ -151,6 +155,7 @@ fn main() -> ! {
         }
 
         if input.button_wait(Button::B1) {
+            lcm.pwm_disable();
             lcm.relay_enable();
             led.set_high();
         }
