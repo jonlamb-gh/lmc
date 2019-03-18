@@ -54,6 +54,9 @@ fn main() -> ! {
     let mut gpioa = p.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
 
+    let mut led = gpioa.pa5.into_push_pull_output(&mut gpioa.crl);
+    led.set_low();
+
     // USART2
     let tx = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
     let rx = gpioa.pa3;
@@ -137,6 +140,7 @@ fn main() -> ! {
 
     writeln!(stdout, "Starting").ok();
 
+    led.set_low();
     loop {
         if input.button_wait(Button::B2) {
             if lcm.pwm_enabled() {
@@ -148,9 +152,11 @@ fn main() -> ! {
 
         if input.button_wait(Button::B1) {
             lcm.relay_enable();
+            led.set_high();
         }
 
         if input.button_wait(Button::B0) {
+            led.set_low();
             lcm.pwm_disable();
             lcm.relay_disable();
         }
