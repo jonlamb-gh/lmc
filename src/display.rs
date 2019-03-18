@@ -2,6 +2,7 @@ use core::fmt::Write;
 use crate::lcm::{Freq, State, Status};
 use embedded_graphics::fonts::Font6x8;
 use embedded_graphics::prelude::*;
+use embedded_hal::blocking;
 use heapless::consts::U32;
 use heapless::String;
 use ssd1306::mode::GraphicsMode;
@@ -12,7 +13,7 @@ const SLAVE_ADDRESS: u8 = 0x3C;
 
 pub struct Display<I2C>
 where
-    I2C: embedded_hal::blocking::i2c::Write,
+    I2C: blocking::i2c::Write,
 {
     drv: GraphicsMode<I2cInterface<I2C>>,
 }
@@ -44,10 +45,13 @@ where
 
     pub fn draw_lcm_status(&mut self, status: &Status) {
         // TODO - custom fmt for Status
+
+        self.drv.clear();
+
         let mut value_str: String<U32> = String::new();
 
         value_str.clear();
-        write!(value_str, " PWR: {}", status.power()).ok();
+        write!(value_str, " PWM: {}", status.pwm()).ok();
 
         self.drv.draw(
             Font6x8::render_str(&value_str)
@@ -81,9 +85,9 @@ where
         );
 
         value_str.clear();
-        match status.pwr_en_pin_state() {
-            true => write!(value_str, "  EN: ON").ok(),
-            false => write!(value_str, "  EN: OFF").ok(),
+        match status.pwm_oe() {
+            true => write!(value_str, "  OE: ON").ok(),
+            false => write!(value_str, "  OE: OFF").ok(),
         };
 
         self.drv.draw(
@@ -93,7 +97,7 @@ where
         );
 
         value_str.clear();
-        match status.relay_en_pin_state() {
+        match status.pwm_relay() {
             true => write!(value_str, " RLY: ON").ok(),
             false => write!(value_str, " RLY: OFF").ok(),
         };

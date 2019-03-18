@@ -1,23 +1,39 @@
-// https://crates.io/crates/pwm-pca9685
-// http://wiki.sunfounder.cc/index.php?title=PCA9685_16_Channel_12_Bit_PWM_Servo_Driver
-
-// https://www.st.com/content/ccc/resource/technical/document/user_manual/98/2e/fa/4b/e0/82/43/b7/DM00105823.pdf/files/DM00105823.pdf/jcr:content/translations/en.DM00105823.pdf
-
 #![no_std]
 #![no_main]
 
 extern crate cortex_m_rt as rt;
 
-// mod display;
-// mod lcm;
+mod display;
+mod lcm;
 
-// use core::fmt::Write;
-// use crate::lcm::Lcm;
-// use crate::display::Display;
+use core::fmt::Write;
+use crate::display::Display;
+use crate::lcm::Lcm;
 use crate::rt::{entry, exception, ExceptionFrame};
+use nb::block;
 use panic_semihosting;
-use pwm_pca9685::{Channel, OutputLogicState, Pca9685, SlaveAddr};
-use stm32f1xx_hal::{i2c::BlockingI2c, i2c::Mode, pac, prelude::*};
+// use stm32f1xx_hal::gpioa::{PA2, PA3};
+use stm32f1xx_hal::i2c::{BlockingI2c, Mode};
+use stm32f1xx_hal::pac::{self, USART2};
+use stm32f1xx_hal::prelude::*;
+use stm32f1xx_hal::serial::{Rx, Serial, Tx};
+
+// TODO - bsp.rs with pin type mappings for the nucleo-64 board
+
+// struct DebugConsole(Serial<pac::USART2, (PA2, PA3)>);
+struct DebugConsole {
+    tx: Tx<USART2>,
+    _rx: Rx<USART2>,
+}
+
+impl Write for DebugConsole {
+    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+        for &b in s.as_bytes() {
+            block!(self.tx.write(b as _)).ok();
+        }
+        Ok(())
+    }
+}
 
 #[entry]
 fn main() -> ! {
@@ -26,18 +42,41 @@ fn main() -> ! {
     let mut flash = p.FLASH.constrain();
     let mut rcc = p.RCC.constrain();
 
-    let clocks = rcc.cfgr.freeze(&mut flash.acr);
+    let clocks = rcc.cfgr.sysclk(32.mhz()).freeze(&mut flash.acr);
 
     let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
+    let mut gpioa = p.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
 
-    let scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
-    let sda = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
+    // USART2
+    let tx = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
+    let rx = gpioa.pa3;
 
-    let i2c = BlockingI2c::i2c1(
+    let serial = Serial::usart2(
+        p.USART2,
+        (tx, rx),
+        &mut afio.mapr,
+        115_200.bps(),
+        clocks,
+        &mut rcc.apb1,
+    );
+
+    let (tx, rx) = serial.split();
+    let mut stdout = DebugConsole { tx, _rx: rx };
+
+    // PB4, D5
+    // PB5, D4
+    let pwm_oe = gpiob.pb4.into_push_pull_output(&mut gpiob.crl);
+    let pwm_relay = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
+
+    // I2C1
+    let pwm_scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
+    let pwm_sda = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
+
+    let pwm_i2c = BlockingI2c::i2c1(
         p.I2C1,
-        (scl, sda),
+        (pwm_scl, pwm_sda),
         &mut afio.mapr,
         Mode::Standard { frequency: 100_000 },
         clocks,
@@ -48,19 +87,54 @@ fn main() -> ! {
         1000,
     );
 
-    let address = SlaveAddr::default();
-    let mut pwm = Pca9685::new(i2c, address);
-    pwm.set_prescale(3).unwrap();
-    pwm.enable().unwrap();
-    pwm.set_channel_on(Channel::C0, 0).unwrap();
+    let mut lcm = Lcm::new(pwm_i2c, pwm_oe, pwm_relay);
+
+    // I2C2
+    let disp_scl = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
+    let disp_sda = gpiob.pb11.into_alternate_open_drain(&mut gpiob.crh);
+
+    let disp_i2c = BlockingI2c::i2c2(
+        p.I2C2,
+        (disp_scl, disp_sda),
+        Mode::Standard { frequency: 100_000 },
+        clocks,
+        &mut rcc.apb1,
+        1000,
+        10,
+        1000,
+        1000,
+    );
+
+    let mut disp = Display::new(disp_i2c);
+
+    // ADC_0, PA0, A0
+    // ADC_1, PA1, A1
+    // ADC_4, PA4, A2
+    let ain0 = gpioa.pa0.into_analog(&mut gpioa.crl);
+    let ain1 = gpioa.pa1.into_analog(&mut gpioa.crl);
+    // let ain2 = gpioa.pa4.into_analog(&mut gpioa.crl);
+
+    // PA10, D2
+    // PA8, D7
+    // PA9, D8
+    let btn0_in = gpioa.pa10.into_push_pull_output(&mut gpioa.crh);
+    let btn1_in = gpioa.pa8.into_push_pull_output(&mut gpioa.crh);
+    let btn2_in = gpioa.pa9.into_push_pull_output(&mut gpioa.crh);
+
+    writeln!(stdout, "Starting").ok();
 
     let mut val: u16 = 0;
     loop {
-        pwm.set_channel_off(Channel::C0, val).unwrap();
+        lcm.set_pwm(val);
 
-        val = val.wrapping_add(1);
+        let status = lcm.status();
 
-        cortex_m::asm::delay(1000);
+        disp.draw_lcm_status(&status);
+
+        val = val.wrapping_add(10);
+        if val >= 4096 {
+            val = 0;
+        }
     }
 }
 
