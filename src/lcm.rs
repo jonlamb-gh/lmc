@@ -57,7 +57,9 @@ where
         lcm.pwm_drv.enable().unwrap();
 
         // TODO
-        // set_output_logic_state()
+        lcm.pwm_drv
+            .set_output_logic_state(OutputLogicState::Direct)
+            .unwrap();
 
         lcm.pwm_drv.set_channel_full_off(Channel::All).unwrap();
 
@@ -65,8 +67,15 @@ where
     }
 
     pub fn status(&self) -> Status {
+        // TODO
+        let state = if self.relay_enabled() {
+            State::On
+        } else {
+            State::Off
+        };
+
         Status {
-            state: State::Off,
+            state,
             pwm: self.pwm(),
             pwm_oe: self.pwm_enabled(),
             pwm_relay: self.relay_enabled(),
@@ -91,24 +100,24 @@ where
         self.pwm_oe.is_set_low()
     }
 
-    fn pwm_disable(&mut self) {
+    pub fn pwm_disable(&mut self) {
         self.pwm_oe.set_high();
     }
 
-    fn pwm_enable(&mut self) {
+    pub fn pwm_enable(&mut self) {
         self.pwm_oe.set_low();
     }
 
     pub fn relay_enabled(&self) -> bool {
-        self.pwm_relay.is_set_low()
+        self.pwm_relay.is_set_high()
     }
 
-    fn relay_disable(&mut self) {
-        self.pwm_relay.set_high();
-    }
-
-    fn relay_enable(&mut self) {
+    pub fn relay_disable(&mut self) {
         self.pwm_relay.set_low();
+    }
+
+    pub fn relay_enable(&mut self) {
+        self.pwm_relay.set_high();
     }
 }
 

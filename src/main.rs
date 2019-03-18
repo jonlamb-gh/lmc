@@ -3,20 +3,23 @@
 
 extern crate cortex_m_rt as rt;
 
+mod debounce_input;
 mod display;
 mod input;
 mod lcm;
 
 use core::fmt::Write;
 use crate::display::Display;
-use crate::input::Input;
+use crate::input::{AIn, Button, Input};
 use crate::lcm::Lcm;
 use crate::rt::{entry, exception, ExceptionFrame};
 use nb::block;
 use panic_semihosting;
 // use stm32f1xx_hal::gpioa::{PA2, PA3};
+use stm32f1xx_hal::adc::Adc;
+use stm32f1xx_hal::gpio::State;
 use stm32f1xx_hal::i2c::{BlockingI2c, Mode};
-use stm32f1xx_hal::pac::{self, USART2};
+use stm32f1xx_hal::pac::{self, ADC1, USART2};
 use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::serial::{Rx, Serial, Tx};
 
@@ -69,8 +72,13 @@ fn main() -> ! {
 
     // PB4, D5
     // PB5, D4
-    let pwm_oe = gpiob.pb4.into_push_pull_output(&mut gpiob.crl);
-    let pwm_relay = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
+    // TODO - need an external pull-up resistor on OE or use llc
+    let pwm_oe = gpiob
+        .pb4
+        .into_push_pull_output_with_state(&mut gpiob.crl, State::High);
+    let pwm_relay = gpiob
+        .pb5
+        .into_push_pull_output_with_state(&mut gpiob.crl, State::Low);
 
     // I2C1
     let pwm_scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
@@ -116,29 +124,44 @@ fn main() -> ! {
     let ain1 = gpioa.pa1.into_analog(&mut gpioa.crl);
     // let ain2 = gpioa.pa4.into_analog(&mut gpioa.crl);
 
+    let mut adc = Adc::adc1(p.ADC1, &mut rcc.apb2);
+
     // PA10, D2
     // PA8, D7
     // PA9, D8
-    let btn0_in = gpioa.pa10.into_push_pull_output(&mut gpioa.crh);
-    let btn1_in = gpioa.pa8.into_push_pull_output(&mut gpioa.crh);
-    let btn2_in = gpioa.pa9.into_push_pull_output(&mut gpioa.crh);
+    let btn0_in = gpioa.pa10.into_pull_up_input(&mut gpioa.crh);
+    let btn1_in = gpioa.pa8.into_pull_up_input(&mut gpioa.crh);
+    let btn2_in = gpioa.pa9.into_pull_up_input(&mut gpioa.crh);
 
-    // let input = Input::new(btn0_in, btn1_in, btn2_in, ain0, ain1);
+    let mut input = Input::new(btn0_in, btn1_in, btn2_in, adc, ain0, ain1);
 
     writeln!(stdout, "Starting").ok();
 
-    let mut val: u16 = 0;
     loop {
-        lcm.set_pwm(val);
+        if input.button_wait(Button::B2) {
+            if lcm.pwm_enabled() {
+                lcm.pwm_disable();
+            } else {
+                lcm.pwm_enable();
+            }
+        }
+
+        if input.button_wait(Button::B1) {
+            lcm.relay_enable();
+        }
+
+        if input.button_wait(Button::B0) {
+            lcm.pwm_disable();
+            lcm.relay_disable();
+        }
+
+        let pwm_sp = input.ain(AIn::AIN0);
+
+        lcm.set_pwm(pwm_sp);
 
         let status = lcm.status();
 
         disp.draw_lcm_status(&status);
-
-        val = val.wrapping_add(10);
-        if val >= 4096 {
-            val = 0;
-        }
     }
 }
 
