@@ -60,9 +60,10 @@ where
         );
 
         value_str.clear();
-        match status.freq() {
-            Freq::Continuous => write!(value_str, "FREQ: CONT").ok(),
-            Freq::Periodic(freq) => write!(value_str, "FREQ: {}", freq).ok(),
+        match status.state() {
+            State::Error => write!(value_str, "STAT: ERR").ok(),
+            State::Off => write!(value_str, "STAT: OFF").ok(),
+            State::On => write!(value_str, "STAT: ON").ok(),
         };
 
         self.drv.draw(
@@ -72,10 +73,9 @@ where
         );
 
         value_str.clear();
-        match status.state() {
-            State::Error => write!(value_str, "STAT: ERR").ok(),
-            State::Off => write!(value_str, "STAT: OFF").ok(),
-            State::On => write!(value_str, "STAT: ON").ok(),
+        match status.freq() {
+            Freq::Continuous => write!(value_str, "FREQ: CONT").ok(),
+            Freq::Periodic(freq) => write!(value_str, "FREQ: {}", freq).ok(),
         };
 
         self.drv.draw(

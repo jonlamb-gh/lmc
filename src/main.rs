@@ -4,10 +4,12 @@
 extern crate cortex_m_rt as rt;
 
 mod display;
+mod input;
 mod lcm;
 
 use core::fmt::Write;
 use crate::display::Display;
+use crate::input::Input;
 use crate::lcm::Lcm;
 use crate::rt::{entry, exception, ExceptionFrame};
 use nb::block;
@@ -120,6 +122,8 @@ fn main() -> ! {
     let btn0_in = gpioa.pa10.into_push_pull_output(&mut gpioa.crh);
     let btn1_in = gpioa.pa8.into_push_pull_output(&mut gpioa.crh);
     let btn2_in = gpioa.pa9.into_push_pull_output(&mut gpioa.crh);
+
+    // let input = Input::new(btn0_in, btn1_in, btn2_in, ain0, ain1);
 
     writeln!(stdout, "Starting").ok();
 

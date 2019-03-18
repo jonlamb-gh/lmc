@@ -8,11 +8,10 @@ edition = "2018"
 panic-semihosting = "0.5.1"
 cortex-m-semihosting = "0.3.2"
 heapless = "0.4.2"
-#embedded-graphics = "0.4.7"
-ssd1306 = { path = "./ssd1306" }
-embedded-graphics = { path = "./embedded-graphics/embedded-graphics" }
 pwm-pca9685 = "0.1.0"
 nb = "0.1.1"
+ssd1306 = { path = "./deps/ssd1306" }
+embedded-graphics = { path = "./deps/embedded-graphics/embedded-graphics" }
 
 [dependencies.cortex-m]
 version = "0.5.8"
@@ -27,7 +26,8 @@ features = ["unproven"]
 version = "0.2.2"
 
 [dependencies.stm32f1xx-hal]
-version = "0.2.1"
+#version = "0.2.1"
+path = "./deps/stm32f1xx-hal"
 features = ["stm32f103", "rt"]
 
 [profile.release]

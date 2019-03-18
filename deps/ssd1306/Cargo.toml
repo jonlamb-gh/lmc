@@ -1,0 +1,45 @@
+[package]
+authors = ["James Waples <jamwaffles@gmail.com>"]
+categories = ["embedded", "no-std"]
+description = "I2C/SPI driver for the SSD1306 OLED display controller"
+documentation = "https://docs.rs/ssd1306"
+exclude = [".travis.yml", ".gitignore"]
+keywords = ["no-std", "ssd1306", "oled", "embedded", "embedded-hal-driver"]
+license = "MIT OR Apache-2.0"
+name = "ssd1306"
+readme = "README.md"
+repository = "https://github.com/jamwaffles/ssd1306"
+version = "0.2.4"
+edition = "2018"
+[badges.travis-ci]
+branch = "master"
+repository = "jamwaffles/ssd1306"
+
+[dependencies]
+embedded-hal = "0.2.2"
+
+[dev-dependencies.stm32f1xx-hal]
+version = "0.2.0"
+features = [ "rt", "stm32f103" ]
+
+[dependencies.embedded-graphics]
+optional = true
+#version = "0.4.5"
+path = "../embedded-graphics/embedded-graphics"
+
+[dev-dependencies]
+cortex-m = "0.5.8"
+cortex-m-rt = "0.6.7"
+panic-semihosting = "0.5.1"
+
+[features]
+default = ["graphics"]
+graphics = ["embedded-graphics"]
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+[profile.release]
+codegen-units = 1
+debug = true
+lto = true

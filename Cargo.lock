@@ -114,7 +114,7 @@ dependencies = [
  "panic-semihosting 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pwm-pca9685 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssd1306 0.2.4",
- "stm32f1xx-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stm32f1xx-hal 0.2.1",
 ]
 
 [[package]]
@@ -238,7 +238,6 @@ dependencies = [
 [[package]]
 name = "stm32f1xx-hal"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -327,7 +326,6 @@ dependencies = [
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum stm32f1 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5c9a197094ef680c79c5018701f0c03f0dc673cbf4a0df944371d3f83c71161d"
-"checksum stm32f1xx-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c69099c8ceba8a0279cb8c028c5a2dd1effc7bf5031e511335ba06d3660ff82f"
 "checksum syn 0.15.29 (registry+https://github.com/rust-lang/crates.io-index)" = "1825685f977249735d510a242a6727b46efe914bb67e38d30c071b1b72b1d5c2"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"

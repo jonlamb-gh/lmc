@@ -1,0 +1,47 @@
+dist: xenial
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+
+matrix:
+  include:
+    # # Linux
+    # - env: TARGET=aarch64-unknown-linux-gnu
+
+    # Raspberry Pi 1
+    - env: TARGET=arm-unknown-linux-gnueabi
+    # Raspberry Pi 2, 3, etc
+    - env: TARGET=armv7-unknown-linux-gnueabihf
+
+    - env: TARGET=x86_64-unknown-linux-gnu
+    - env: TARGET=x86_64-unknown-linux-musl
+
+    # Bare metal
+    - env: TARGET=thumbv6m-none-eabi
+    - env: TARGET=thumbv7em-none-eabi
+    - env: TARGET=thumbv7em-none-eabihf
+    - env: TARGET=thumbv7m-none-eabi
+
+before_install:
+  - rustup component add rustfmt
+  - pip install linkchecker --user
+
+script:
+  - cargo fmt --all -- --check
+  - cargo test --release -p embedded-graphics
+  - cargo test --release -p tinybmp
+  - cargo test --release --all-features -p embedded-graphics
+  - cargo test --release --all-features -p tinybmp
+
+after_success:
+  - cargo doc
+  - linkchecker target/doc/embedded_graphics
+  - linkchecker target/doc/tinybmp
+
+cache: cargo
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
