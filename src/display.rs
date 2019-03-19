@@ -75,7 +75,7 @@ where
         value_str.clear();
         match status.freq() {
             Freq::Continuous => write!(value_str, "FREQ: CONT").ok(),
-            Freq::Periodic(freq) => write!(value_str, "FREQ: {}", freq).ok(),
+            Freq::Periodic(freq) => write!(value_str, "FREQ: {}", freq.0).ok(),
         };
 
         self.drv.draw(

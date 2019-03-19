@@ -1,3 +1,4 @@
+use core::cmp;
 use crate::debounce_input::DebounceInput;
 use embedded_hal::adc::{Channel, OneShot};
 use embedded_hal::digital::InputPin;
@@ -69,5 +70,13 @@ where
             AIn::AIN0 => block!(self.adc.read(&mut self.ain0)).unwrap(),
             AIn::AIN1 => block!(self.adc.read(&mut self.ain1)).unwrap(),
         }
+    }
+
+    pub fn ain_map(&mut self, ain: AIn, out_min: u32, out_max: u32) -> u32 {
+        let in_min: u32 = 0;
+        let in_max: u32 = 4095;
+        let x = cmp::min(self.ain(ain) as u32, in_max);
+
+        (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
     }
 }

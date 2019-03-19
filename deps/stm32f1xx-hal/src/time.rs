@@ -9,7 +9,7 @@ use crate::rcc::Clocks;
 pub struct Bps(pub u32);
 
 /// Hertz
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Hertz(pub u32);
 
 /// KiloHertz

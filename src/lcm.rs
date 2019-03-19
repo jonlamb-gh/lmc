@@ -1,11 +1,14 @@
+use core::cmp;
+use crate::hal::time::Hertz;
 use embedded_hal::{blocking, digital};
 use pwm_pca9685::{Channel, OutputLogicState, Pca9685, SlaveAddr};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+const PWM_MAX: u16 = 4095;
+
+#[derive(Debug, Clone, Copy)]
 pub enum Freq {
     Continuous,
-    // TODO - time::Hz?
-    Periodic(u32),
+    Periodic(Hertz),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -30,6 +33,7 @@ pub struct Lcm<I2C, OE, RLY> {
     pwm_oe: OE,
     pwm_relay: RLY,
     pwm: u16,
+    freq: Freq,
 }
 
 impl<I2C, OE, RLY, E> Lcm<I2C, OE, RLY>
@@ -46,6 +50,7 @@ where
             pwm_oe: oe,
             pwm_relay: relay,
             pwm: 0,
+            freq: Freq::Continuous,
         };
 
         lcm.relay_disable();
@@ -79,12 +84,21 @@ where
             pwm: self.pwm(),
             pwm_oe: self.pwm_enabled(),
             pwm_relay: self.relay_enabled(),
-            freq: Freq::Continuous,
+            freq: self.freq(),
         }
     }
 
+    pub fn set_freq(&mut self, freq: Freq) {
+        // TODO
+        self.freq = freq;
+    }
+
+    pub fn freq(&self) -> Freq {
+        self.freq
+    }
+
     pub fn set_pwm(&mut self, pwm: u16) {
-        self.pwm = if pwm > 4095 { 4095 } else { pwm };
+        self.pwm = cmp::min(pwm, PWM_MAX);
 
         self.pwm_drv.set_channel_on(Channel::All, 0).unwrap();
         self.pwm_drv

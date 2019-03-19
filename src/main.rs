@@ -2,6 +2,7 @@
 #![no_main]
 
 extern crate cortex_m_rt as rt;
+extern crate stm32f1xx_hal as hal;
 
 mod debounce_input;
 mod display;
@@ -10,22 +11,24 @@ mod lcm;
 
 use core::fmt::Write;
 use crate::display::Display;
+use crate::hal::adc::Adc;
+use crate::hal::gpio::State;
+use crate::hal::i2c::{BlockingI2c, Mode};
+use crate::hal::pac as stm32;
+use crate::hal::pac::USART2;
+use crate::hal::prelude::*;
+use crate::hal::serial::{Rx, Serial, Tx};
+use crate::hal::time::Hertz;
 use crate::input::{AIn, Button, Input};
-use crate::lcm::Lcm;
+use crate::lcm::{Freq, Lcm};
 use crate::rt::{entry, exception, ExceptionFrame};
 use nb::block;
 use panic_semihosting;
-// use stm32f1xx_hal::gpioa::{PA2, PA3};
-use stm32f1xx_hal::adc::Adc;
-use stm32f1xx_hal::gpio::State;
-use stm32f1xx_hal::i2c::{BlockingI2c, Mode};
-use stm32f1xx_hal::pac::{self, ADC1, USART2};
-use stm32f1xx_hal::prelude::*;
-use stm32f1xx_hal::serial::{Rx, Serial, Tx};
 
 // TODO - bsp.rs with pin type mappings for the nucleo-64 board
+// use crate::hal::gpioa::{PA2, PA3};
 
-// struct DebugConsole(Serial<pac::USART2, (PA2, PA3)>);
+// struct DebugConsole(Serial<stm32::USART2, (PA2, PA3)>);
 struct DebugConsole {
     tx: Tx<USART2>,
     _rx: Rx<USART2>,
@@ -42,7 +45,7 @@ impl Write for DebugConsole {
 
 #[entry]
 fn main() -> ! {
-    let p = pac::Peripherals::take().expect("Failed to take stm32::Peripherals");
+    let p = stm32::Peripherals::take().expect("Failed to take stm32::Peripherals");
 
     let mut flash = p.FLASH.constrain();
     let mut rcc = p.RCC.constrain();
@@ -129,9 +132,8 @@ fn main() -> ! {
     // ADC_4, PA4, A2
     let ain0 = gpioa.pa0.into_analog(&mut gpioa.crl);
     let ain1 = gpioa.pa1.into_analog(&mut gpioa.crl);
-    // let ain2 = gpioa.pa4.into_analog(&mut gpioa.crl);
 
-    let mut adc = Adc::adc1(p.ADC1, &mut rcc.apb2);
+    let adc = Adc::adc1(p.ADC1, &mut rcc.apb2);
 
     // PA10, D2
     // PA8, D7
@@ -168,7 +170,16 @@ fn main() -> ! {
 
         let pwm_sp = input.ain(AIn::AIN0);
 
+        let raw_freq = input.ain_map(AIn::AIN1, 0, 100) as u16;
+        let freq_sp = if raw_freq == 0 {
+            Freq::Continuous
+        } else {
+            Freq::Periodic(Hertz(raw_freq as u32))
+        };
+
         lcm.set_pwm(pwm_sp);
+
+        lcm.set_freq(freq_sp);
 
         let status = lcm.status();
 
