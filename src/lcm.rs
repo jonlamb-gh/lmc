@@ -1,7 +1,12 @@
 use core::cmp;
+use crate::hal::pac::TIM2;
 use crate::hal::time::Hertz;
+use crate::hal::timer::Timer;
+use embedded_hal::timer::CountDown;
 use embedded_hal::{blocking, digital};
 use pwm_pca9685::{Channel, OutputLogicState, Pca9685, SlaveAddr};
+// use crate::hal::timer::{Event as TimerEvent, Timer};
+// use crate::hal::pac::interrupt;
 
 const PWM_MAX: u16 = 4095;
 
@@ -32,10 +37,12 @@ pub struct Lcm<I2C, OE, RLY> {
     pwm_drv: Pca9685<I2C>,
     pwm_oe: OE,
     pwm_relay: RLY,
+    timer: Timer<TIM2>,
     pwm: u16,
     freq: Freq,
 }
 
+// TODO - make TIM/TIMER generic, but listen()/etc are not traits (yet)?
 impl<I2C, OE, RLY, E> Lcm<I2C, OE, RLY>
 where
     I2C: blocking::i2c::Write<Error = E>,
@@ -43,12 +50,13 @@ where
     OE: digital::StatefulOutputPin + digital::OutputPin,
     RLY: digital::StatefulOutputPin + digital::OutputPin,
 {
-    pub fn new(i2c: I2C, oe: OE, relay: RLY) -> Self {
+    pub fn new(i2c: I2C, oe: OE, relay: RLY, timer: Timer<TIM2>) -> Self {
         let address = SlaveAddr::default();
         let mut lcm = Lcm {
             pwm_drv: Pca9685::new(i2c, address),
             pwm_oe: oe,
             pwm_relay: relay,
+            timer,
             pwm: 0,
             freq: Freq::Continuous,
         };
@@ -89,8 +97,15 @@ where
     }
 
     pub fn set_freq(&mut self, freq: Freq) {
-        // TODO
         self.freq = freq;
+
+        if let Freq::Periodic(f) = self.freq {
+            self.timer.start(f);
+        // self.timer.listen(TimerEvent::Update);
+        } else {
+            // self.timer.cancel();
+            // self.timer.unlisten(TimerEvent::Update);
+        }
     }
 
     pub fn freq(&self) -> Freq {

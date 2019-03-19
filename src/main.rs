@@ -15,15 +15,17 @@ use crate::hal::adc::Adc;
 use crate::hal::gpio::State;
 use crate::hal::i2c::{BlockingI2c, Mode};
 use crate::hal::pac as stm32;
-use crate::hal::pac::USART2;
+use crate::hal::pac::{TIM2, USART2};
 use crate::hal::prelude::*;
 use crate::hal::serial::{Rx, Serial, Tx};
 use crate::hal::time::Hertz;
+use crate::hal::timer::Timer;
 use crate::input::{AIn, Button, Input};
 use crate::lcm::{Freq, Lcm};
 use crate::rt::{entry, exception, ExceptionFrame};
 use nb::block;
 use panic_semihosting;
+// use crate::hal::pac::{interrupt, Interrupt, TIM2, USART2};
 
 // TODO - bsp.rs with pin type mappings for the nucleo-64 board
 // use crate::hal::gpioa::{PA2, PA3};
@@ -45,6 +47,8 @@ impl Write for DebugConsole {
 
 #[entry]
 fn main() -> ! {
+    // let cp = cortex_m::peripheral::Peripherals::take().expect("Failed to take
+    // cm::Peripherals");
     let p = stm32::Peripherals::take().expect("Failed to take stm32::Peripherals");
 
     let mut flash = p.FLASH.constrain();
@@ -82,13 +86,17 @@ fn main() -> ! {
 
     // PB4, D5
     // PB5, D4
+    // PB3, D3
     // TODO - need an external pull-up resistor on OE or use llc
     let pwm_oe = gpiob
-        .pb4
+        .pb3
         .into_push_pull_output_with_state(&mut gpiob.crl, State::High);
     let pwm_relay = gpiob
         .pb5
         .into_push_pull_output_with_state(&mut gpiob.crl, State::Low);
+
+    // PB3, D3 is also TIM2_CH2
+    let lcm_timer: Timer<TIM2> = Timer::tim2(p.TIM2, 1.hz(), clocks, &mut rcc.apb1);
 
     // I2C1
     let pwm_scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
@@ -107,7 +115,7 @@ fn main() -> ! {
         1000,
     );
 
-    let mut lcm = Lcm::new(pwm_i2c, pwm_oe, pwm_relay);
+    let mut lcm = Lcm::new(pwm_i2c, pwm_oe, pwm_relay, lcm_timer);
 
     // I2C2
     let disp_scl = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
@@ -145,6 +153,12 @@ fn main() -> ! {
     let mut input = Input::new(btn0_in, btn1_in, btn2_in, adc, ain0, ain1);
 
     writeln!(stdout, "Starting").ok();
+
+    // TODO
+    // let mut nvic = cp.NVIC;
+    // nvic.enable(Interrupt::TIM2);
+    // unsafe { nvic.set_priority(Interrupt::TIM2, 1) };
+    // cortex_m::peripheral::NVIC::unpend(Interrupt::TIM2);
 
     led.set_low();
     loop {
