@@ -100,8 +100,8 @@ where
         self.freq = freq;
 
         if let Freq::Periodic(f) = self.freq {
-            self.timer.start(f);
-        // self.timer.listen(TimerEvent::Update);
+            // self.timer.start(f);
+            // self.timer.listen(TimerEvent::Update);
         } else {
             // self.timer.cancel();
             // self.timer.unlisten(TimerEvent::Update);
