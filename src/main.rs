@@ -29,6 +29,9 @@ use panic_semihosting;
 
 // TODO - bsp.rs with pin type mappings for the nucleo-64 board
 // use crate::hal::gpioa::{PA2, PA3};
+// type PwmI2c = BlockingI2c<I2C1, (PB8<Alternate<OpenDrain>>,
+// PB9<Alternate<OpenDrain>>)>; type PwmOePin = PB3<Output<PushPull>>;
+// type PwmRelayPin = PB5<Output<PushPull>>;
 
 // struct DebugConsole(Serial<stm32::USART2, (PA2, PA3)>);
 struct DebugConsole {
@@ -87,15 +90,22 @@ fn main() -> ! {
     // PB4, D5
     // PB5, D4
     // PB3, D3
-    // TODO - need an external pull-up resistor on OE or use llc
+    // PA9, D8
+    // PB6, D10
+    // NOTE: PB3 isn't working for some reason?
+    //    let pwm_oe = gpiob
+    //        .pb3
+    //        .into_push_pull_output_with_state(&mut gpiob.crl, State::High);
     let pwm_oe = gpiob
-        .pb3
+        .pb6
         .into_push_pull_output_with_state(&mut gpiob.crl, State::High);
+
     let pwm_relay = gpiob
         .pb5
         .into_push_pull_output_with_state(&mut gpiob.crl, State::Low);
 
     // PB3, D3 is also TIM2_CH2
+    // TODO - use pwm to drive PB3, pwm rate = (2 * freq) @ 50% duty
     let lcm_timer: Timer<TIM2> = Timer::tim2(p.TIM2, 1.hz(), clocks, &mut rcc.apb1);
 
     // I2C1
