@@ -14,6 +14,7 @@ use crate::display::Display;
 use crate::hal::adc::Adc;
 use crate::hal::gpio::State;
 use crate::hal::i2c::{BlockingI2c, Mode};
+use crate::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use crate::hal::pac as stm32;
 use crate::hal::pac::{TIM2, USART2};
 use crate::hal::prelude::*;
@@ -62,6 +63,8 @@ fn main() -> ! {
         .sysclk(64.mhz())
         .pclk1(32.mhz())
         .freeze(&mut flash.acr);
+
+    let mut wdt = Iwdg::new(p.IWDG, IwdgConfig::from(WatchdogTimeout::Wdto500ms));
 
     let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
@@ -170,14 +173,27 @@ fn main() -> ! {
     // unsafe { nvic.set_priority(Interrupt::TIM2, 1) };
     // cortex_m::peripheral::NVIC::unpend(Interrupt::TIM2);
 
+    // Wait for all buttons
+    let _ = input.button_wait(Button::B0);
+    let _ = input.button_wait(Button::B1);
+    let _ = input.button_wait(Button::B2);
+    cortex_m::asm::delay(2000);
+
     led.set_low();
     loop {
-        if input.button_wait(Button::B2) {
-            if lcm.pwm_enabled() {
-                lcm.pwm_disable();
-            } else {
-                lcm.pwm_enable();
-            }
+        wdt.refresh();
+
+        if input.button(Button::B2) {
+            // if input.button_wait(Button::B2) {
+            // if lcm.pwm_enabled() {
+            //    lcm.pwm_disable();
+            // } else {
+            //    lcm.pwm_enable();
+            // }
+
+            lcm.pwm_enable();
+        } else {
+            lcm.pwm_disable();
         }
 
         if input.button_wait(Button::B1) {

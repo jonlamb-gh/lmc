@@ -99,7 +99,7 @@ where
     pub fn set_freq(&mut self, freq: Freq) {
         self.freq = freq;
 
-        if let Freq::Periodic(f) = self.freq {
+        if let Freq::Periodic(_f) = self.freq {
             // self.timer.start(f);
             // self.timer.listen(TimerEvent::Update);
         } else {
